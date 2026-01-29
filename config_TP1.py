@@ -3,6 +3,8 @@
 import arenas
 import robot_braitenberg_loveBot
 import robot_dumb
+import robot_subsomption
+
 
 
 # general -- first three parameters can be overwritten with command-line arguments (cf. "python tetracomposibot.py --help")
@@ -29,7 +31,7 @@ def initialize_robots(arena_size=-1, particle_box=-1): # particle_box: size of t
     #x_center = arena_size // 2 - particle_box / 2
     y_center = arena_size // 2 - particle_box / 2
     robots = []
-    robots.append(robot_braitenberg_hateBot.Robot_player(20, y_center, 0, name="My Robot", team="A"))
+    robots.append(robot_subsomption.Robot_player(20, y_center, 0, name="My Robot", team="A"))
     robots.append(robot_dumb.Robot_player(23, y_center + 2, 180, name="Amel", team="B"))
     robots.append(robot_dumb.Robot_player(30, y_center - 2, 180, name="Tassa", team="B"))
     return robots
