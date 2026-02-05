@@ -1,0 +1,3 @@
+Best found at eval: 333
+Best score: 850.5687065945559
+Best params: [1, 1, -1, 1, -1, 1, 1, -1]
