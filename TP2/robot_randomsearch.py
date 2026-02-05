@@ -9,73 +9,118 @@ class Robot_player(Robot):
 
     team_name = "RandomSearch"
     robot_id = -1
-    iteration = 0
-    param = []
-    bestParam = []
-    bestScore = -1e9
-    bestTrial = -1
-    it_per_evaluation = 400
-    max_evals = 500
-    replay_iterations = 1000
-    trial = 0
-    replay_mode = False
-    x_0 = 0
-    y_0 = 0
-    theta_0 = 0
 
-    def __init__(self, x_0, y_0, theta_0, name="n/a", team="n/a"):
+    def __init__(self, x_0, y_0, theta_0, name="n/a", team="n/a", evaluations=500, it_per_evaluation=400, replay_iterations=1000):
         global nb_robots
         self.robot_id = nb_robots
         nb_robots += 1
-
+        super().__init__(x_0, y_0, theta_0, name=name, team=team)
         self.x_0 = x_0
         self.y_0 = y_0
         self.theta_0 = theta_0
-
-        self.param = [random.randint(-1, 1) for _ in range(8)]
-
-        super().__init__(x_0, y_0, theta_0, name=name, team=team)
+        #param de perceptron
+        self.param = self.random_param()
+        #parametres
+        self.max_evals = evaluations
+        self.it_per_evaluation = it_per_evaluation
+        self.replay_iterations = replay_iterations
+        #etat recherche/replay
+        self.replay_mode = False
+        self.eval_id = 0
+        self.iter_in_eval = 0
+        self.iter_in_replay = 0 
+        #score(effectif)
+        self.score_eval = 0.0
+        self.prev_trans = 0.0
+        self.prev_rot = 0.0
+        #meilleur individu
+        self.bestScore = float("-inf")
+        self.bestParam = self.param[:]
+        self.bestEval = -1
+        #trace
+        print("# eval_id, score_current, best_so_far")
 
     def reset(self):
         super().reset()
+        #on remet aussi nos refs a 0
+        self.prev_trans = 0.0
+        self.prev_rot = 0.0
+    
+    def random_param(self):
+        return [random.randint(-1, 1) for _ in range(8)]
 
-    def step(self, sensors, sensor_view=None, sensor_robot=None, sensor_team=None):
-
-        #fin de l evaluation
-        if not self.replay_mode and self.iteration % self.it_per_evaluation == 0:
-            if self.iteration > 0:
-                score = self.log_sum_of_translation
-                print("Trial", self.trial,"// score =", score,"// params =", self.param)
-                if score > self.bestScore:
-                    self.bestScore = score
-                    self.bestParam = self.param.copy()
-                    self.bestTrial = self.trial
-                    print("nouveau best trouve dans les evals", self.bestTrial,"// score =", self.bestScore)
-
-            self.trial += 1
-
-            #nombre total d individus atteint (500) on passe en mode replay
-            if self.trial >= self.max_evals:
-                self.replay_mode = True
-                self.param = self.bestParam.copy()
-                self.iteration = 0
-                print("\nreplay de la best strategy")
-                print("Best score =", self.bestScore)
-                print("Best params =", self.bestParam)
-                return 0, 0, True
-
-            #nouvelle strategie aletoire
-            self.param = [random.randint(-1, 1) for _ in range(8)]
-            self.iteration += 1
-            return 0, 0, True
-
-        #mode replay on reset toutes les 1000
-        if self.replay_mode and self.iteration % self.replay_iterations == 0:
-            self.iteration += 1
-            return 0, 0, True
-
-        #controle perceptron
+    def control(self, sensors):
         translation = math.tanh ( self.param[0] + self.param[1] * sensors[sensor_front_left] + self.param[2] * sensors[sensor_front] + self.param[3] * sensors[sensor_front_right] )
         rotation = math.tanh ( self.param[4] + self.param[5] * sensors[sensor_front_left] + self.param[6] * sensors[sensor_front] + self.param[7] * sensors[sensor_front_right] )
-        self.iteration += 1
+        return translation,rotation
+    
+    def update_score_effective(self):
+        #deltas effectifs depuis le pasprecedents
+        dtrans = self.log_sum_of_translation - self.prev_trans
+        drot = self.log_sum_of_rotation - self.prev_rot
+        #maj des precs
+        self.prev_trans = self.log_sum_of_translation
+        self.prev_rot = self.log_sum_of_rotation
+        #score(t) = trans_effective(t) * (1 - abs(rot_effective(t)))
+        self.score_eval += dtrans * (1.0 - drot)
+
+    def step(self, sensors, sensor_view=None, sensor_robot=None, sensor_team=None):
+        #mode replay, on rejoue le meilleur a l infini par blocs de 1000 it
+        if self.replay_mode:
+            translation, rotation = self.control(sensors)
+            self.iter_in_replay += 1
+
+            if self.iter_in_replay >= self.replay_iterations:
+                self.iter_in_replay = 0
+                return 0, 0, True  #on reset tous les 1000
+            return translation, rotation, False
+
+        #mode recherhce, on evalue des strategies aleatoires
+        #maj du score avec la translation et rotation effective du pas prec
+        if self.iter_in_eval > 0:
+            self.update_score_effective()
+
+        #si fin d evaluatuon
+        if self.iter_in_eval >= self.it_per_evaluation:
+            #on affiche et on sauvegarde le meilleur
+            score = self.score_eval
+            if self.bestScore == float("-inf"):
+                print(self.eval_id, ",", score, ",", score)
+            else:
+                print(self.eval_id, ",", score, ",", self.bestScore)
+
+            if score > self.bestScore:
+                self.bestScore = score
+                self.bestParam = self.param[:]
+                self.bestEval = self.eval_id
+                print(f"[NEW BEST] eval={self.bestEval} score={self.bestScore:.6f} params={self.bestParam}")
+
+            #procahine evaluation
+            self.eval_id += 1
+
+            #si budget epuise on bascule en mode replaty
+            if self.eval_id >= self.max_evals:
+                self.replay_mode = True
+                self.param = self.bestParam[:]
+                self.iter_in_replay = 0
+                print("\n=== RANDOM SEARCH FINISHED ===")
+                print("Best found at eval:", self.bestEval)
+                print("Best score:", self.bestScore)
+                print("Best params:", self.bestParam)
+                print("=== REPLAY BEST FOREVER (chunks of 1000 iters) ===\n")
+
+                #reset pour demarrer le mode replay
+                self.iter_in_eval = 0
+                self.score_eval = 0.0
+                return 0, 0, True
+
+            #sinon nouvelle sstrat aleatoire et reset
+            self.param = self.random_param()
+            self.iter_in_eval = 0
+            self.score_eval = 0.0
+            return 0, 0, True
+
+        #commande normale pendant l evaluation
+        translation, rotation = self.control(sensors)
+        self.iter_in_eval += 1
         return translation, rotation, False
