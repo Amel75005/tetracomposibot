@@ -11,7 +11,7 @@ class Robot_player(Robot):
     robot_id = -1
 
     def __init__(self, x_0, y_0, theta_0, name="n/a", team="n/a",
-                 evaluations=500, it_per_evaluation=400, replay_iterations=1000):
+                 evaluations=166, it_per_evaluation=400, replay_iterations=1000):
 
         global nb_robots
         self.robot_id = nb_robots
@@ -50,6 +50,14 @@ class Robot_player(Robot):
         self.bestParam = self.param[:]
         self.bestEval = -1
         print("# eval_id, score_strategy(3 reps), best_so_far")
+
+        #pour ecirire dnas un CSV
+        self.run_id = random.randint(0, 10**9)
+        self.csv_name = f"results_randomsearch2_{self.run_id}.csv"
+        self.csv = open(self.csv_name, "w", encoding="utf-8")
+        self.csv.write("eval,score,best\n")
+        self.csv.flush()
+
     def reset(self):
         #orientation aleatoire a chaque reset pendant la recherche
         if not self.replay_mode:
@@ -75,7 +83,7 @@ class Robot_player(Robot):
         self.prev_trans = self.log_sum_of_translation
         self.prev_rot = self.log_sum_of_rotation
 
-        self.score_eval += dtrans * (1.0 - drot)
+        self.score_eval += dtrans * (1.0 - abs(drot))
 
     def step(self, sensors, sensor_view=None, sensor_robot=None, sensor_team=None):
 
@@ -118,11 +126,19 @@ class Robot_player(Robot):
                 self.bestParam = self.param[:]
                 self.bestEval = self.eval_id
                 print("[NEW BEST] eval =", self.bestEval, "score =", self.bestScore, "params =", self.bestParam)
+            
+            #pour ecorie dans le CSV 
+            self.csv.write(f"{self.eval_id},{score_total},{self.bestScore}\n")
+            self.csv.flush()
             #prochaine strat
             self.eval_id += 1
 
+            
+
             #si budget fini replay
             if self.eval_id >= self.max_evals:
+                #on ferme le fichiers CSV
+                self.csv.close()
                 self.replay_mode = True
                 self.param = self.bestParam[:]
                 self.iter_in_replay = 0
