@@ -46,6 +46,15 @@ class Robot_player(Robot):
         self.bestEval = -1
         print("# eval_id, score_parent, best_so_far")
 
+        #pour ecrire le csv 
+        self.run_id = random.randint(0, 10**9)
+        self.csv_name = f"results_genetic_{self.run_id}.csv"
+        self.csv = open(self.csv_name, "w", encoding="utf-8")
+        self.csv.write("eval,score,best\n")
+        self.csv.flush()
+
+
+
     def reset(self):
         super().reset()
         self.prev_trans = 0.0
@@ -113,11 +122,16 @@ class Robot_player(Robot):
             else:
                 print(self.eval_id, ",", self.parentScore, ",", self.bestScore)
 
-            # gégeneration suiv
+            self.csv.write(f"{self.eval_id},{self.parentScore},{self.bestScore}\n")
+            self.csv.flush()
+            # gegeneration suiv
             self.eval_id += 1
 
             #fin du budget, replay best
             if self.eval_id >= self.max_evals:
+                #pour fermer le csv 
+                self.csv.close()
+
                 self.replay_mode = True
                 self.param = self.bestParam[:] #on rejoue le meilleur
                 self.iter_in_replay = 0
