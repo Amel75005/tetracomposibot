@@ -55,7 +55,7 @@ class Robot_player(Robot):
         self.run_id = random.randint(0, 10**9)
         self.csv_name = f"results_randomsearch2_{self.run_id}.csv"
         self.csv = open(self.csv_name, "w", encoding="utf-8")
-        self.csv.write("eval,score,best\n")
+        self.csv.write("eval,score,best,p0,p1,p2,p3,p4,p5,p6,p7\n")
         self.csv.flush()
 
     def reset(self):
@@ -128,7 +128,9 @@ class Robot_player(Robot):
                 print("[NEW BEST] eval =", self.bestEval, "score =", self.bestScore, "params =", self.bestParam)
             
             #pour ecorie dans le CSV 
-            self.csv.write(f"{self.eval_id},{score_total},{self.bestScore}\n")
+            p = self.bestParam
+            self.csv.write(f"{self.eval_id},{score_total},{self.bestScore},"
+    f"{p[0]},{p[1]},{p[2]},{p[3]},{p[4]},{p[5]},{p[6]},{p[7]}\n")
             self.csv.flush()
             #prochaine strat
             self.eval_id += 1
