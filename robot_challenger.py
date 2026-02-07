@@ -9,44 +9,75 @@
 
 from robot import * 
 import random
+import robot_ga 
 nb_robots = 0
 
 class Robot_player(Robot):
+
+    """
+    Challenger arbre de comportement:
+    1. Eviter les ennemis (si un robot ennemi est détecté, tourner dans l'autre direction).
+    2. Longer un mur si il est latéral avec une probabilité de 0.9, sinon éviter.
+    3. Eviter les murs.
+    4. Utiliser un comportement optimisé par un agent génétique.
+    """
 
     team_name = "Tasmel"  # vous pouvez modifier le nom de votre équipe
     robot_id = -1             # ne pas modifier. Permet de connaitre le numéro de votre robot.
     memory = 0                # vous n'avez le droit qu'a une case mémoire qui doit être obligatoirement un entier
 
+    LATERAL_SENSORS = [sensor_front_left, sensor_left, sensor_front_right, sensor_right]
+    NON_LATERAL_SENSORS = [sensor_front, sensor_rear_left, sensor_rear, sensor_rear_right]
+
     def __init__(self, x_0, y_0, theta_0, name="n/a", team="n/a"):
         global nb_robots
         self.robot_id = nb_robots
         nb_robots+=1
+        self.ga_agent = robot_ga.Robot_player(x_0, y_0, theta_0, name=team, team=self.team_name)
         super().__init__(x_0, y_0, theta_0, name="Robot "+str(self.robot_id), team=self.team_name)
 
+    def reset(self):
+        super().reset()
+        self.ga_agent.reset()
+
     def step(self, sensors, sensor_view=None, sensor_robot=None, sensor_team=None):
-        #on s est inspire du tp1, comportement hateWall
-        sensor_to_wall = []
-        #on separe murs 1 et robots 2 et vides autres valeurs
-        for i in range(8):
-            if sensor_view[i] == 1: #la c est un mur
-                sensor_to_wall.append(sensors[i])
-            else: #robot ou vide on ignore
-                sensor_to_wall.append(1.0)
-        
-        #on active les murs : 1-dist
-        wall_front = 1.0 - sensor_to_wall[sensor_front]
-        wall_front_left = 1.0 - sensor_to_wall[sensor_front_left]
-        wall_front_right = 1.0 - sensor_to_wall[sensor_front_right]
-        #si mur a gauche on active a gauche, si a droite on active a droite
-        #si il est devant, il n est ni a gauche ni a droite mais danger pour les deux
-        left  = wall_front_left + 0.5 * wall_front
-        right = wall_front_right + 0.5 * wall_front
-        #on fuit le mur
-        rotation = (right - left) * 1.2
-        #on ralentit quand on est proche du mur
-        translation = 0.6 - 0.8 * (wall_front + wall_front_left + wall_front_right)
-        #on borne
-        translation = max(0.0, min(1.0, translation))
-        rotation = max(-1.0, min(1.0, rotation))
-        return translation, rotation, False
+         # 1) detection d'un robot ennemi = tourner dans l'autre direction
+        if any(view == 2 for view in sensor_view):  # Si un robot ennemi est détecté
+            return 1.0, 1.0, False  # Avancer et tourner dans l'autre direction
+
+        # 2) detection d'un mur lateral
+        if sensor_view and any(sensor_view[i] == 1 for i in self.LATERAL_SENSORS):
+            if random.random() < 0.9:  # Suivre le mur avec une probabilité de 0.9
+                thr = sensors[sensor_front]  # Distance à l'obstacle devant
+                translation = thr * 0.5  # Avancer
+                rot_left = sensors[sensor_left] + sensors[sensor_front_left]
+                rot_right = sensors[sensor_right] + sensors[sensor_front_right]
+                rotation = (rot_left - rot_right) * 0.2  # Rotation pour suivre le mur
+                rotation = max(min(rotation, 1.0), -1.0)  # Limite la rotation entre -1 et 1
+                return translation, rotation, False
+            else:  # Sinon, éviter le mur
+                free_dirs = [i for i in range(8) if not (sensor_view and sensor_view[i] == 1)]
+                if not free_dirs:
+                    return 1.0, random.uniform(-1.0, 1.0), False
+                dir_idx = random.choice(free_dirs)
+                angle = dir_idx * 45 if dir_idx <= 4 else (dir_idx - 8) * 45
+                if angle > 180:
+                    angle -= 360
+                rotation = angle / 180.0
+                return 1.0, rotation, False
+
+        # 3) Détection d un mur non-lateral
+        if sensor_view and any(sensor_view[i] == 1 for i in self.NON_LATERAL_SENSORS):
+            free_dirs = [i for i in range(8) if not (sensor_view and sensor_view[i] == 1)]
+            if not free_dirs:
+                return 1.0, random.uniform(-1.0, 1.0), False
+            dir_idx = random.choice(free_dirs)
+            angle = dir_idx * 45 if dir_idx <= 4 else (dir_idx - 8) * 45
+            if angle > 180:
+                angle -= 360
+            rotation = angle / 180.0
+            return 1.0, rotation, False
+
+        # 4) Sinon : comportement optimise par l agent génétique
+        return self.ga_agent.step(sensors, sensor_view, sensor_robot, sensor_team)
 

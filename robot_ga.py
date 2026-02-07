@@ -7,7 +7,7 @@ class Robot_player(Robot):
 
     def __init__(self, x_0, y_0, theta_0, name="n/a", team="A"):
         super().__init__(x_0, y_0, theta_0, name=name, team=team)
-        self.param = [0,0,1,1,-1,1,1,-1]
+        self.param = [1,0,1,1,1,1,-1,-1]
 
     def reset(self):
         super().reset()
